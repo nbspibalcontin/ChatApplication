@@ -1,5 +1,6 @@
 ﻿using Client;
 using Microsoft.AspNetCore.SignalR.Client;
+using System;
 
 class Program
 {
@@ -57,10 +58,19 @@ class Program
 
                     if (!string.IsNullOrEmpty(userName))
                     {
-                        await hubConnection.SendAsync("ConnectUser", userName);
-                        Console.WriteLine("\nYou have joined the chat.Type 'p' to see previous messages. Type 'discon' to disconnect from the chat");
+                        //Check if the username is already taken.
+                        bool isAvailable = await CheckUsernameAvailability(userName);
+                        if (isAvailable)
+                        {
+                            await hubConnection.SendAsync("ConnectUser", userName);
+                            Console.WriteLine("\nYou have joined the chat. Type 'p' to see previous messages. Type 'discon' to disconnect from the chat");
 
-                        await StartChatInteraction(userName);
+                            await StartChatInteraction(userName);
+                        }
+                        else
+                        {
+                            Console.WriteLine("\nUsername is already taken. Please choose another.");
+                        }
                     }
                     else
                     {
@@ -98,8 +108,7 @@ class Program
                     await hubConnection.SendAsync("RetrieveMessages"); //Retrieve the previous message
                     break;
                 case "discon":
-                    await DisconnectUser();
-                    await PromptReconnect();
+                    await PromptDisconnect(); // Ask the user for confirmation before disconnecting
                     break;
                 default:
                     await SendMessageToServer(user, message);
@@ -178,6 +187,20 @@ class Program
         };
     }
 
+    //Check if the username is available
+    static async Task<bool> CheckUsernameAvailability(string userName)
+    {
+        try
+        {
+            return await hubConnection.InvokeAsync<bool>("CheckUsernameAvailability", userName);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error checking username availability: {ex.Message}");
+            return false;
+        }
+    }
+
     //Display all the connected users
     static void DisplayConnectedUsers(IEnumerable<string> users)
     {
@@ -191,6 +214,33 @@ class Program
             foreach (var u in users)
             {
                 Console.WriteLine($"- {u}");
+            }
+        }
+    }
+
+    //Prompt if the user want to disconnect 
+    static async Task PromptDisconnect()
+    {
+        while (true)
+        {
+            Console.WriteLine("Are you sure you want to disconnect? (y/n)");
+            var confirmDisconnect = Console.ReadLine()?.Trim().ToLower();
+
+            switch (confirmDisconnect)
+            {
+                case "y":
+                    await DisconnectUser();
+                    await PromptReconnect();
+                    return; // Exit method after disconnecting
+
+                case "n":
+                    Console.WriteLine("Disconnect canceled. Continuing chat.");
+                    await StartChatInteraction(userName); // Return to chat interaction
+                    return; // Exit method without disconnecting
+
+                default:
+                    Console.WriteLine("Invalid input. Please enter 'y' or 'n'.");
+                    break;
             }
         }
     }

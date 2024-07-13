@@ -24,9 +24,11 @@ namespace Server.Service
             {
                 // Add the username to the list of connected users
                 ConnectedUsers.Add(userName);
+                Console.WriteLine($"User '{userName}' added to ConnectedUsers.");
 
                 // Map the user's connection ID to their username
                 UserConnections[Context.ConnectionId] = userName;
+                Console.WriteLine($"Mapped connection ID '{Context.ConnectionId}' to user '{userName}'.");
 
                 // Notify all clients that a user has joined the chat
                 await Clients.All.SendAsync("UserJoined", userName, ConnectedUsers);
@@ -64,7 +66,7 @@ namespace Server.Service
         {
             try
             {
-                // Create a new chat message entity
+/*                // Create a new chat message entity
                 var chatMessage = new ChatMessage
                 {
                     UserName = userName,
@@ -77,13 +79,19 @@ namespace Server.Service
                     // Add the chat message to the database context and save changes
                     _dbContext.ChatMessages.Add(chatMessage);
                     await _dbContext.SaveChangesAsync();
-                }
+                }*/
 
                 // Retrieve all active connection IDs of currently connected users
                 var connectionIds = UserConnections
                 .Where(kv => ConnectedUsers.Contains(kv.Value))
                 .Select(kv => kv.Key) // Select the connection IDs
                 .ToList();
+
+                Console.WriteLine("Active Connection IDs:");
+                foreach (var connectionId in connectionIds)
+                {
+                    Console.WriteLine(connectionId);
+                }
 
                 // Send the message to all connected clients with the current timestamp
                 await Clients.Clients(connectionIds).SendAsync("ReceiveMessage", userName, message, DateTime.UtcNow);
@@ -123,6 +131,13 @@ namespace Server.Service
         private async Task SendSystemErrorMessage(string message)
         {
             await Clients.Caller.SendAsync("ErrorMessage", message);
+        }
+
+        public bool CheckUsernameAvailability(string userName)
+        {
+            // Check if the username is already in ConnectedUsers
+            bool isAvailable = !ConnectedUsers.Contains(userName);
+            return isAvailable;
         }
     }
 }
