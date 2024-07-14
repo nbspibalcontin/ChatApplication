@@ -85,7 +85,7 @@ namespace Server.Service
         }
 
         //Reconnect user to the room with new userName
-        public async Task ReconnectUserWithNewUsername(string newUserName)
+        public async Task ReconnectUserWithNewUsername(string oldUserName,string newUserName)
         {
             try
             {
@@ -98,7 +98,7 @@ namespace Server.Service
                 Console.WriteLine($"Mapped connection ID '{Context.ConnectionId}' to user '{newUserName}'.");
 
                 // Notify all clients that a user has joined the chat
-                await Clients.All.SendAsync("ReconnectUserWithNewUsername", newUserName, ConnectedUsers);
+                await Clients.All.SendAsync("ReconnectUserWithNewUsername", oldUserName, newUserName, ConnectedUsers);
             }
             catch (Exception ex)
             {

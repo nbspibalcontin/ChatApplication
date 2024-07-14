@@ -162,9 +162,9 @@ class Program
         });
 
         // Handle the reconnect user from the chat room with new Username
-        hubConnection.On<string, IEnumerable<string>>("ReconnectUserWithNewUsername", (newUserName, users) =>
+        hubConnection.On<string, string, IEnumerable<string>>("ReconnectUserWithNewUsername", (oldUserName, newUserName, users) =>
         {
-            Console.WriteLine($"{userName} reconnected with new name {newUserName} as the previous one was taken.");
+            Console.WriteLine($"{oldUserName} reconnected with new name {newUserName} as the previous one was taken.");
             DisplayConnectedUsers(users);
         });
 
@@ -334,9 +334,9 @@ class Program
                 {
                     string newUserName = await PromptForNewUsername();
                     if (!string.IsNullOrEmpty(newUserName))
-                    {
+                    {                  
+                        await hubConnection.SendAsync("ReconnectUserWithNewUsername", userName, newUserName); // Send a request to reconnect the user
                         userName = newUserName;
-                        await hubConnection.SendAsync("ReconnectUserWithNewUsername", newUserName); // Send a request to reconnect the user
                         break;
                     }
                 }
@@ -353,7 +353,7 @@ class Program
     {
         while (true)
         {
-            Console.WriteLine("\nUsername is already taken. Please choose another. 1");
+            Console.WriteLine("\nUsername is already taken. Please choose another.");
             Console.Write("Enter a new username: ");
             var newUserName = Console.ReadLine()?.Trim();
 
