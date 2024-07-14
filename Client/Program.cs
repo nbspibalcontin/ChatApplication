@@ -1,11 +1,15 @@
 ﻿using Client;
 using Microsoft.AspNetCore.SignalR.Client;
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 class Program
 {
     private static HubConnection hubConnection;
     private static string userName;
+
     static async Task Main(string[] args)
     {
         Console.WriteLine("Welcome to the simple chat application");
@@ -39,48 +43,26 @@ class Program
             while (true)
             {
                 Console.WriteLine("Enter 1 to join the chat or type 'exit' to quit");
-                var input = Console.ReadLine();
+                var input = Console.ReadLine()?.Trim().ToLower();
 
-                if (input.ToLower() == "exit")
+                switch (input)
                 {
-                    Console.WriteLine("Are you sure you want to exit? (y/n)");
-                    var confirmExit = Console.ReadLine()?.Trim().ToLower();
-                    if (confirmExit == "y")
-                    {
-                        await hubConnection.DisposeAsync();
-                        Environment.Exit(0);
-                    }
-                }
-                else if (input == "1")
-                {
-                    Console.Write("Enter your username: ");
-                    userName = Console.ReadLine();
-
-                    if (!string.IsNullOrEmpty(userName))
-                    {
-                        //Check if the username is already taken.
-                        bool isAvailable = await CheckUsernameAvailability(userName);
-                        if (isAvailable)
+                    case "exit":
+                        if (ConfirmExit())
                         {
-                            await hubConnection.SendAsync("ConnectUser", userName);
-                            Console.WriteLine("\nYou have joined the chat. Type 'p' to see previous messages. Type 'discon' to disconnect from the chat");
+                            await hubConnection.DisposeAsync();
+                            Environment.Exit(0);
+                        }
+                        break;
 
-                            await StartChatInteraction(userName);
-                        }
-                        else
-                        {
-                            Console.WriteLine("\nUsername is already taken. Please choose another.");
-                        }
-                    }
-                    else
-                    {
-                        Console.WriteLine("Username cannot be empty.");
-                    }
+                    case "1":
+                        await JoinChat();
+                        break;
+
+                    default:
+                        Console.WriteLine("Please input a valid value");
+                        break;
                 }
-                else
-                {
-                    Console.WriteLine("Please input a valid value");
-                }   
             }
         }
         catch (Exception ex)
@@ -89,7 +71,31 @@ class Program
         }
     }
 
-    static async Task StartChatInteraction(string user)
+    static async Task JoinChat()
+    {
+        Console.Write("Enter your username: ");
+        userName = Console.ReadLine()?.Trim();
+
+        if (string.IsNullOrEmpty(userName))
+        {
+            Console.WriteLine("Username cannot be empty.");
+            return;
+        }
+
+        if (await CheckUsernameAvailability(userName))
+        {
+            await hubConnection.SendAsync("ConnectUser", userName);
+            Console.WriteLine("\nYou have joined the chat. Type 'p' to see previous messages. Type 'discon' to disconnect from the chat");
+
+            await StartChatInteraction();
+        }
+        else
+        {
+            Console.WriteLine("\nUsername is already taken. Please choose another.");
+        }
+    }
+
+    static async Task StartChatInteraction()
     {
         while (true)
         {
@@ -105,24 +111,24 @@ class Program
             switch (message.ToLower())
             {
                 case "p":
-                    await hubConnection.SendAsync("RetrieveMessages"); //Retrieve the previous message
+                    await hubConnection.SendAsync("RetrieveMessages"); // Retrieve the previous messages
                     break;
                 case "discon":
                     await PromptDisconnect(); // Ask the user for confirmation before disconnecting
                     break;
                 default:
-                    await SendMessageToServer(user, message);
+                    await SendMessageToServer(message);
                     break;
             }
         }
     }
 
     // Send the message to the server
-    static async Task SendMessageToServer(string user, string message)
+    static async Task SendMessageToServer(string message)
     {
         try
         {
-            await hubConnection.SendAsync("SendMessage", user, message);
+            await hubConnection.SendAsync("SendMessage", userName, message);
         }
         catch (Exception ex)
         {
@@ -130,33 +136,54 @@ class Program
         }
     }
 
-    //This responsible for recieving data from server
+    static bool ConfirmExit()
+    {
+        Console.WriteLine("Are you sure you want to exit? (y/n)");
+        var confirmExit = Console.ReadLine()?.Trim().ToLower();
+        return confirmExit == "y";
+    }
+
+    // This method is responsible for receiving data from the server
     static void RegisterHubEvents()
     {
-        //Handles incoming data when a user joins the chat, updating the console accordingly.
-        hubConnection.On<string, IEnumerable<string>>("UserJoined", (user, users) =>
+        // Handle incoming data when a user joins the chat, updating the console accordingly.
+        hubConnection.On<string, IEnumerable<string>>("UserJoined", (userName, users) =>
         {
-            Console.WriteLine($"\nUser joined: {user}");
+            Console.WriteLine($"\nUser joined: {userName}");
             DisplayConnectedUsers(users);
         });
 
-        //Handle the disconnect user from the chat room
-        hubConnection.On<string, IEnumerable<string>>("UserDisconnected", (user, users) =>
+        // Handle the disconnect user from the chat room
+        hubConnection.On<string, IEnumerable<string>>("UserDisconnected", (userName, users) =>
         {
-            Console.WriteLine($"\nUser disconnected: {user}");
+            Console.WriteLine($"\nUser disconnected: {userName}");
             DisplayConnectedUsers(users);
         });
 
-        //Handles incoming data when a user send message, updating the console accordingly.
-        hubConnection.On<string, string, DateTime>("ReceiveMessage", (user, message, timestamp) =>
+        // Handle the reconnect user from the chat room
+        hubConnection.On<string, IEnumerable<string>>("ReconnectUser", (userName, users) =>
         {
-            Console.WriteLine($"\n{timestamp.ToLocalTime()} {user}: {message}");
+            Console.WriteLine($"{userName} reconnected with the room");
+            DisplayConnectedUsers(users);
         });
 
-        //Handle incoming previous messages from the server.
+        // Handle the reconnect user from the chat room with new Username
+        hubConnection.On<string, IEnumerable<string>>("ReconnectUserWithNewUsername", (newUserName, users) =>
+        {
+            Console.WriteLine($"{userName} reconnected with new name {newUserName} as the previous one was taken.");
+            DisplayConnectedUsers(users);
+        });
+
+        // Handle incoming data when a user sends a message, updating the console accordingly.
+        hubConnection.On<string, string, DateTime>("ReceiveMessage", (userName, message, timestamp) =>
+        {
+            Console.WriteLine($"\n{timestamp.ToLocalTime()} {userName}: {message}");
+        });
+
+        // Handle incoming previous messages from the server.
         hubConnection.On<List<ChatMessage>>("GetPreviousMessages", (messages) =>
         {
-            //Check if no messages found in the database
+            // Check if no messages found in the database
             if (messages == null || messages.Count == 0)
             {
                 Console.WriteLine("\nNo previous data found.");
@@ -172,13 +199,13 @@ class Program
             }
         });
 
-        //Handles incoming friendly error message from the server
+        // Handle incoming friendly error messages from the server
         hubConnection.On<string>("ErrorMessage", (message) =>
         {
             Console.WriteLine($"\n{message}");
         });
 
-        //Check the Websocket if running or close unexpectedly
+        // Check the WebSocket if running or closed unexpectedly
         hubConnection.Closed += async (exception) =>
         {
             Console.WriteLine($"Connection closed: {exception?.Message}");
@@ -187,21 +214,7 @@ class Program
         };
     }
 
-    //Check if the username is available
-    static async Task<bool> CheckUsernameAvailability(string userName)
-    {
-        try
-        {
-            return await hubConnection.InvokeAsync<bool>("CheckUsernameAvailability", userName);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error checking username availability: {ex.Message}");
-            return false;
-        }
-    }
-
-    //Display all the connected users
+    // Display all the connected users
     static void DisplayConnectedUsers(IEnumerable<string> users)
     {
         if (users == null || !users.Any())
@@ -218,7 +231,7 @@ class Program
         }
     }
 
-    //Prompt if the user want to disconnect 
+    // Prompt if the user wants to disconnect 
     static async Task PromptDisconnect()
     {
         while (true)
@@ -235,7 +248,7 @@ class Program
 
                 case "n":
                     Console.WriteLine("Disconnect canceled. Continuing chat.");
-                    await StartChatInteraction(userName); // Return to chat interaction
+                    await StartChatInteraction(); // Return to chat interaction
                     return; // Exit method without disconnecting
 
                 default:
@@ -245,7 +258,7 @@ class Program
         }
     }
 
-    //Disconncect the user from the chat room
+    // Disconnect the user from the chat room
     static async Task DisconnectUser()
     {
         try
@@ -271,13 +284,13 @@ class Program
         }
     }
 
-    //Prompt if the user want to reconnect 
+    // Prompt if the user wants to reconnect 
     static async Task PromptReconnect()
     {
         while (true)
         {
             Console.WriteLine("Type 'recon' to reconnect, Type 'exit' to quit");
-            var input = Console.ReadLine();         
+            var input = Console.ReadLine();
 
             if (input.ToLower() == "recon")
             {
@@ -295,7 +308,7 @@ class Program
         }
     }
 
-    //Reconnect user to the chat room
+    // Reconnect user to the chat room
     static async Task ReconnectUser()
     {
         try
@@ -312,12 +325,72 @@ class Program
                 await hubConnection.StartAsync(); // Start the connection
             }
 
-            await hubConnection.SendAsync("ConnectUser", userName); // Send a request to reconnect the user
-            Console.WriteLine($"{userName} is reconnected to the chat room");
+            while (true)
+            {
+                // Check if the username still available
+                if (await CheckUsernameAvailability(userName))
+                {
+                    await hubConnection.SendAsync("ReconnectUser", userName); // Send a request to reconnect the user
+                    break;
+                }
+                else
+                {
+                    string newUserName = await PromptForNewUsername();
+                    if (!string.IsNullOrEmpty(newUserName))
+                    {
+                        userName = newUserName;
+                        await hubConnection.SendAsync("ReconnectUserWithNewUsername", newUserName); // Send a request to reconnect the user
+                        break;
+                    }
+                }
+            }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error during reconnection: {ex.Message}");
+        }
+    }
+
+    static async Task<string> PromptForNewUsername()
+    {
+        while (true)
+        {
+            Console.WriteLine("\nUsername is already taken. Please choose another.");
+            Console.Write("Enter a new username: ");
+            var newUserName = Console.ReadLine()?.Trim();
+
+            if (string.IsNullOrEmpty(newUserName))
+            {
+                Console.WriteLine("Username cannot be empty. Please enter a valid username.");
+                continue;
+            }
+
+            if (newUserName == userName)
+            {
+                Console.WriteLine("Your previous username is already taken after you disconnect. Please choose another.");
+                continue; // Prompt again for a different username
+            }
+
+            if (await CheckUsernameAvailability(newUserName))
+            {
+                return newUserName;
+            }
+
+            Console.WriteLine("Username is already taken. Please choose another.");
+        }
+    }
+
+    // Check if the username is available
+    static async Task<bool> CheckUsernameAvailability(string userName)
+    {
+        try
+        {
+            return await hubConnection.InvokeAsync<bool>("CheckUsernameAvailability", userName);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error checking username availability: {ex.Message}");
+            return false;
         }
     }
 }

@@ -61,6 +61,51 @@ namespace Server.Service
             }
         }
 
+        public async Task ReconnectUser(string userName)
+        {
+            try
+            {
+                // Add the username to the list of connected users
+                ConnectedUsers.Add(userName);
+                Console.WriteLine($"User '{userName}' added to ConnectedUsers.");
+
+                // Map the user's connection ID to their username
+                UserConnections[Context.ConnectionId] = userName;
+                Console.WriteLine($"Mapped connection ID '{Context.ConnectionId}' to user '{userName}'.");
+
+                // Notify all clients that a user has joined the chat
+                await Clients.All.SendAsync("ReconnectUser", userName, ConnectedUsers);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while reconnecting user.");
+                await SendSystemErrorMessage("An error occurred while reconnecting the client. Please try again.");
+            }
+        }
+
+        //Reconnect user to the room with new userName
+        public async Task ReconnectUserWithNewUsername(string newUserName)
+        {
+            try
+            {
+                // Add the username to the list of connected users
+                ConnectedUsers.Add(newUserName);
+                Console.WriteLine($"User '{newUserName}' added to ConnectedUsers.");
+
+                // Map the user's connection ID to their username
+                UserConnections[Context.ConnectionId] = newUserName;
+                Console.WriteLine($"Mapped connection ID '{Context.ConnectionId}' to user '{newUserName}'.");
+
+                // Notify all clients that a user has joined the chat
+                await Clients.All.SendAsync("ReconnectUserWithNewUsername", newUserName, ConnectedUsers);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error occurred while reconnecting user.");
+                await SendSystemErrorMessage("An error occurred while reconnecting the client. Please try again.");
+            }
+        }
+
         //Sends a message to all connected clients with the sender's username and the current timestamp.
         public async Task SendMessage(string userName, string message)
         {
@@ -98,7 +143,7 @@ namespace Server.Service
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error occurred while connecting user.");
+                _logger.LogError(ex, "Error occurred while sending message");
                 await SendSystemErrorMessage("An error occurred while sending your message. Please try again.");
             }
         }
@@ -135,9 +180,7 @@ namespace Server.Service
 
         public bool CheckUsernameAvailability(string userName)
         {
-            // Check if the username is already in ConnectedUsers
-            bool isAvailable = !ConnectedUsers.Contains(userName);
-            return isAvailable;
+            return !ConnectedUsers.Contains(userName);
         }
     }
 }
