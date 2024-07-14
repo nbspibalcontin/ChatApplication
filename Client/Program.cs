@@ -33,6 +33,7 @@ class Program
             .Build();
     }
 
+
     static async Task ConnectAndJoinChat()
     {
         try
@@ -70,7 +71,7 @@ class Program
             Console.WriteLine($"Error: {ex.Message}");
         }
     }
-
+ 
     static async Task JoinChat()
     {
         Console.Write("Enter your username: ");
@@ -87,7 +88,7 @@ class Program
             await hubConnection.SendAsync("ConnectUser", userName);
             Console.WriteLine("\nYou have joined the chat. Type 'p' to see previous messages. Type 'discon' to disconnect from the chat");
 
-            await StartChatInteraction();
+            await StartChatInteraction(); // Start chat interaction after successful join
         }
         else
         {
@@ -134,13 +135,6 @@ class Program
         {
             Console.WriteLine($"Failed to send message: {ex.Message}");
         }
-    }
-
-    static bool ConfirmExit()
-    {
-        Console.WriteLine("Are you sure you want to exit? (y/n)");
-        var confirmExit = Console.ReadLine()?.Trim().ToLower();
-        return confirmExit == "y";
     }
 
     // This method is responsible for receiving data from the server
@@ -206,11 +200,10 @@ class Program
         });
 
         // Check the WebSocket if running or closed unexpectedly
-        hubConnection.Closed += async (exception) =>
+        hubConnection.Closed += (exception) =>
         {
             Console.WriteLine($"Connection closed: {exception?.Message}");
-            await Task.Delay(new Random().Next(0, 5) * 1000);
-            await hubConnection.StartAsync();
+            return Task.CompletedTask;
         };
     }
 
@@ -267,7 +260,6 @@ class Program
             {
                 // Send a request to the server to disconnect the user
                 await hubConnection.SendAsync("DisconnectUser", userName);
-                Console.WriteLine($"{userName} is disconnected from the chat room");
 
                 await hubConnection.StopAsync(); // Stop the HubConnection
                 await hubConnection.DisposeAsync(); // Dispose the HubConnection
@@ -290,20 +282,24 @@ class Program
         while (true)
         {
             Console.WriteLine("Type 'recon' to reconnect, Type 'exit' to quit");
-            var input = Console.ReadLine();
+            var input = Console.ReadLine()?.ToLower();
 
-            if (input.ToLower() == "recon")
+            switch (input)
             {
-                await ReconnectUser();
-                break;
-            }
-            else if (input.ToLower() == "exit")
-            {
-                Environment.Exit(0);
-            }
-            else
-            {
-                Console.WriteLine("Please input a valid value");
+                case "recon":
+                    await ReconnectUser();
+                    return; // Exit the method after reconnecting
+
+                case "exit":
+                     if (ConfirmExit())
+                        {
+                            Environment.Exit(0);
+                        }
+                        break;
+
+                default:
+                    Console.WriteLine("Please input a valid value");
+                    break;
             }
         }
     }
@@ -320,6 +316,7 @@ class Program
                 RegisterHubEvents();
             }
 
+            //Check of the HubConnection is disconnect to the server
             if (hubConnection.State == HubConnectionState.Disconnected)
             {
                 await hubConnection.StartAsync(); // Start the connection
@@ -351,11 +348,12 @@ class Program
         }
     }
 
+    // Prompt for the NewUsername
     static async Task<string> PromptForNewUsername()
     {
         while (true)
         {
-            Console.WriteLine("\nUsername is already taken. Please choose another.");
+            Console.WriteLine("\nUsername is already taken. Please choose another. 1");
             Console.Write("Enter a new username: ");
             var newUserName = Console.ReadLine()?.Trim();
 
@@ -375,12 +373,10 @@ class Program
             {
                 return newUserName;
             }
-
-            Console.WriteLine("Username is already taken. Please choose another.");
         }
     }
 
-    // Check if the username is available
+    // Check if the username is available or check if the username doesn't exist to the server
     static async Task<bool> CheckUsernameAvailability(string userName)
     {
         try
@@ -392,5 +388,13 @@ class Program
             Console.WriteLine($"Error checking username availability: {ex.Message}");
             return false;
         }
+    }
+
+    // Exit comfirmation
+    static bool ConfirmExit()
+    {
+        Console.WriteLine("Are you sure you want to exit? (y/n)");
+        var confirmExit = Console.ReadLine()?.Trim().ToLower();
+        return confirmExit == "y";
     }
 }

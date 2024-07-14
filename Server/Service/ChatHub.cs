@@ -61,6 +61,7 @@ namespace Server.Service
             }
         }
 
+        // Reconnect user
         public async Task ReconnectUser(string userName)
         {
             try
@@ -111,7 +112,7 @@ namespace Server.Service
         {
             try
             {
-/*                // Create a new chat message entity
+                // Create a new chat message entity
                 var chatMessage = new ChatMessage
                 {
                     UserName = userName,
@@ -124,7 +125,7 @@ namespace Server.Service
                     // Add the chat message to the database context and save changes
                     _dbContext.ChatMessages.Add(chatMessage);
                     await _dbContext.SaveChangesAsync();
-                }*/
+                }
 
                 // Retrieve all active connection IDs of currently connected users
                 var connectionIds = UserConnections
@@ -178,6 +179,8 @@ namespace Server.Service
             await Clients.Caller.SendAsync("ErrorMessage", message);
         }
 
+        // Check the Availability of the username
+        // It check the username is doesn't exist to the ConnectedUser
         public bool CheckUsernameAvailability(string userName)
         {
             return !ConnectedUsers.Contains(userName);
