@@ -47,7 +47,6 @@ class Program
                     case "exit":
                         if (ConfirmExit())
                         {
-                            await _chatService.DisconnectAsync();
                             Environment.Exit(0);
                         }
                         break;

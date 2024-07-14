@@ -85,7 +85,7 @@ namespace Client.Services.Implementation
             }
         }
 
-        // This method is responsible for receiving data from the server
+        // This method is responsible for receiving data from the server then display it to the console
         public void RegisterHubEvents()
         {
             // Handle incoming data when a user joins the chat, updating the console accordingly.
