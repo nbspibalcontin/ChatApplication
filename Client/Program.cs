@@ -14,11 +14,12 @@ class Program
 
     static async Task Main(string[] args)
     {
+        // Initialize ChatService instance
         _chatService = new ChatService();
 
         Console.WriteLine("Welcome to the simple chat application");
-  
-        // Initialize ChatService instance
+
+        // Initialize Hub connection
         _chatService.InitializeConnection();
 
         // Handlers for receiving messages and updates from the server

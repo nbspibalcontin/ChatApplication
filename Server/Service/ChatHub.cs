@@ -49,6 +49,7 @@ namespace Server.Service
                 {
                     ConnectedUsers.Remove(userName);
                     UserConnections.Remove(Context.ConnectionId);
+                    Console.WriteLine($"User '{userName}' removed from ConnectedUsers.");
 
                     // Notify all clients that a user has left the chat
                     await Clients.All.SendAsync("UserDisconnected", userName, ConnectedUsers);
